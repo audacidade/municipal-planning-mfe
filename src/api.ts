@@ -44,6 +44,14 @@ export async function createPlan(input: {
   return parseJson(response);
 }
 
+export async function approvePlan(id: string): Promise<Plan> {
+  return parseJson(await fetch(`/core/plans/${id}/approve`, { method: 'POST' }));
+}
+
+export async function createPlanVersion(id: string): Promise<Plan> {
+  return parseJson(await fetch(`/core/plans/${id}/new-version`, { method: 'POST' }));
+}
+
 export async function fetchBudgetItems(planId?: string): Promise<BudgetItem[]> {
   const qs = planId ? `?planId=${encodeURIComponent(planId)}` : '';
   const response = await fetch(`/core/budget-items${qs}`);

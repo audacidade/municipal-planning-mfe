@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Plus, Target } from 'lucide-react';
 import {
+  approvePlan,
   createBudgetItem,
   createPlan,
+  createPlanVersion,
   fetchBudgetItems,
   fetchPlans,
   formatBrl,
@@ -108,6 +110,32 @@ export default function PlanningApp() {
     }
   }
 
+  async function handleApprove(id: string) {
+    setLoading(true);
+    setError(null);
+    try {
+      await approvePlan(id);
+      await (tab === 'budget' ? loadAllPlans() : loadPlans());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Falha ao aprovar plano');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleNewVersion(id: string) {
+    setLoading(true);
+    setError(null);
+    try {
+      await createPlanVersion(id);
+      await (tab === 'budget' ? loadAllPlans() : loadPlans());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Falha ao criar nova versão');
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-surface-muted p-4 lg:p-8">
       <header className="mb-6">
@@ -201,9 +229,31 @@ export default function PlanningApp() {
                         {plan.type} · {plan.year} · {plan.version ?? 'v1'}
                       </p>
                     </div>
-                    <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold uppercase text-slate-600">
-                      {plan.status}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold uppercase text-slate-600">
+                        {plan.status}
+                      </span>
+                      {plan.status === 'draft' ? (
+                        <button
+                          type="button"
+                          disabled={loading}
+                          onClick={() => handleApprove(plan.id)}
+                          className="h-8 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                        >
+                          Aprovar
+                        </button>
+                      ) : null}
+                      {plan.status === 'approved' ? (
+                        <button
+                          type="button"
+                          disabled={loading}
+                          onClick={() => handleNewVersion(plan.id)}
+                          className="h-8 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                        >
+                          Nova versão
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
                 </article>
               ))
