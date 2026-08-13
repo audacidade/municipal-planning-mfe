@@ -3,6 +3,7 @@ export interface Plan {
   type: 'ppa' | 'ldo' | 'loa';
   year: number;
   name: string;
+  version: string;
   status: string;
 }
 
@@ -22,8 +23,9 @@ async function parseJson<T>(response: Response): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export async function fetchPlans(): Promise<Plan[]> {
-  const response = await fetch('/core/plans');
+export async function fetchPlans(type?: Plan['type']): Promise<Plan[]> {
+  const qs = type ? `?type=${type}` : '';
+  const response = await fetch(`/core/plans${qs}`);
   const data = await parseJson<Plan[] | { items: Plan[] }>(response);
   return Array.isArray(data) ? data : data.items ?? [];
 }
@@ -32,6 +34,7 @@ export async function createPlan(input: {
   type: Plan['type'];
   year: number;
   name: string;
+  version?: string;
 }): Promise<Plan> {
   const response = await fetch('/core/plans', {
     method: 'POST',

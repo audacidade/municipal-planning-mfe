@@ -11,25 +11,33 @@ import {
 } from './api';
 import './styles.css';
 
-type Tab = 'plans' | 'budget';
+type Tab = 'ppa' | 'ldo' | 'loa' | 'budget';
 
 export default function PlanningApp() {
-  const [tab, setTab] = useState<Tab>('plans');
+  const [tab, setTab] = useState<Tab>('ppa');
   const [plans, setPlans] = useState<Plan[]>([]);
   const [items, setItems] = useState<BudgetItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const [planType, setPlanType] = useState<Plan['type']>('loa');
   const [planYear, setPlanYear] = useState(2026);
   const [planName, setPlanName] = useState('');
+  const [planVersion, setPlanVersion] = useState('v1');
 
   const [itemPlanId, setItemPlanId] = useState('');
   const [itemCode, setItemCode] = useState('');
   const [itemDescription, setItemDescription] = useState('');
   const [itemAmount, setItemAmount] = useState('');
 
+  const planType: Plan['type'] | null = tab === 'budget' ? null : tab;
+
   const loadPlans = useCallback(async () => {
+    const data = await fetchPlans(planType ?? undefined);
+    setPlans(data);
+    if (!itemPlanId && data[0]) setItemPlanId(data[0].id);
+  }, [itemPlanId, planType]);
+
+  const loadAllPlans = useCallback(async () => {
     const data = await fetchPlans();
     setPlans(data);
     if (!itemPlanId && data[0]) setItemPlanId(data[0].id);
@@ -41,8 +49,9 @@ export default function PlanningApp() {
   }, [itemPlanId]);
 
   useEffect(() => {
-    loadPlans().catch((e) => setError(e instanceof Error ? e.message : 'Falha ao carregar planos'));
-  }, [loadPlans]);
+    const loader = tab === 'budget' ? loadAllPlans : loadPlans;
+    loader().catch((e) => setError(e instanceof Error ? e.message : 'Falha ao carregar planos'));
+  }, [tab, loadPlans, loadAllPlans]);
 
   useEffect(() => {
     if (tab === 'budget') {
@@ -52,11 +61,16 @@ export default function PlanningApp() {
 
   async function handleCreatePlan(e: React.FormEvent) {
     e.preventDefault();
-    if (!planName.trim()) return;
+    if (!planName.trim() || !planType) return;
     setLoading(true);
     setError(null);
     try {
-      await createPlan({ type: planType, year: planYear, name: planName.trim() });
+      await createPlan({
+        type: planType,
+        year: planYear,
+        name: planName.trim(),
+        version: planVersion.trim() || 'v1',
+      });
       setPlanName('');
       await loadPlans();
     } catch (err) {
@@ -99,7 +113,7 @@ export default function PlanningApp() {
       <header className="mb-6">
         <p className="text-xs font-semibold uppercase tracking-wider text-brand-600">P03 — Planejamento</p>
         <h1 className="text-xl font-bold text-slate-900 lg:text-2xl">Orçamento e Performance</h1>
-        <p className="mt-1 text-sm text-slate-500">PPA, LDO, LOA e itens orçamentários</p>
+        <p className="mt-1 text-sm text-slate-500">Abas PPA / LDO / LOA com versões simplificadas</p>
       </header>
 
       {error ? (
@@ -109,7 +123,9 @@ export default function PlanningApp() {
       <nav className="mb-6 flex gap-1 rounded-lg bg-slate-100 p-1 w-fit">
         {(
           [
-            { id: 'plans' as const, label: 'Planos' },
+            { id: 'ppa' as const, label: 'PPA' },
+            { id: 'ldo' as const, label: 'LDO' },
+            { id: 'loa' as const, label: 'LOA' },
             { id: 'budget' as const, label: 'Itens orçamentários' },
           ] as const
         ).map(({ id, label }) => (
@@ -126,24 +142,14 @@ export default function PlanningApp() {
         ))}
       </nav>
 
-      {tab === 'plans' ? (
+      {tab !== 'budget' ? (
         <div className="grid gap-6 lg:grid-cols-3">
           <form onSubmit={handleCreatePlan} className="rounded-xl border border-slate-200 bg-white p-5 shadow-card">
             <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
               <Plus className="h-4 w-4" />
-              Novo plano
+              Novo {tab.toUpperCase()}
             </div>
-            <label className="mt-4 block text-xs font-semibold uppercase text-slate-500">Tipo</label>
-            <select
-              className="mt-1 h-9 w-full rounded-lg border border-slate-200 px-3 text-sm"
-              value={planType}
-              onChange={(e) => setPlanType(e.target.value as Plan['type'])}
-            >
-              <option value="ppa">PPA</option>
-              <option value="ldo">LDO</option>
-              <option value="loa">LOA</option>
-            </select>
-            <label className="mt-3 block text-xs font-semibold uppercase text-slate-500">Ano</label>
+            <label className="mt-4 block text-xs font-semibold uppercase text-slate-500">Ano</label>
             <input
               type="number"
               className="mt-1 h-9 w-full rounded-lg border border-slate-200 px-3 text-sm"
@@ -151,12 +157,20 @@ export default function PlanningApp() {
               onChange={(e) => setPlanYear(Number(e.target.value))}
               required
             />
+            <label className="mt-3 block text-xs font-semibold uppercase text-slate-500">Versão</label>
+            <input
+              className="mt-1 h-9 w-full rounded-lg border border-slate-200 px-3 text-sm"
+              value={planVersion}
+              onChange={(e) => setPlanVersion(e.target.value)}
+              placeholder="v1"
+              required
+            />
             <label className="mt-3 block text-xs font-semibold uppercase text-slate-500">Nome</label>
             <input
               className="mt-1 h-9 w-full rounded-lg border border-slate-200 px-3 text-sm"
               value={planName}
               onChange={(e) => setPlanName(e.target.value)}
-              placeholder="LOA 2026"
+              placeholder={`${tab.toUpperCase()} ${planYear}`}
               required
             />
             <button
@@ -164,18 +178,18 @@ export default function PlanningApp() {
               disabled={loading}
               className="mt-4 h-9 w-full rounded-lg bg-brand-500 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50"
             >
-              {loading ? 'Salvando…' : 'Criar plano'}
+              {loading ? 'Salvando…' : `Criar ${tab.toUpperCase()}`}
             </button>
           </form>
 
           <section className="lg:col-span-2 space-y-3">
             <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
               <Target className="h-4 w-4" />
-              Planos ({plans.length})
+              {tab.toUpperCase()} ({plans.length})
             </div>
             {plans.length === 0 ? (
               <div className="rounded-xl border border-dashed border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
-                Nenhum plano cadastrado. Crie PPA/LDO/LOA ao lado.
+                Nenhum {tab.toUpperCase()} cadastrado.
               </div>
             ) : (
               plans.map((plan) => (
@@ -184,7 +198,7 @@ export default function PlanningApp() {
                     <div>
                       <p className="font-semibold text-slate-900">{plan.name}</p>
                       <p className="text-xs uppercase text-slate-500">
-                        {plan.type} · {plan.year}
+                        {plan.type} · {plan.year} · {plan.version ?? 'v1'}
                       </p>
                     </div>
                     <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold uppercase text-slate-600">
@@ -212,7 +226,7 @@ export default function PlanningApp() {
             >
               {plans.map((plan) => (
                 <option key={plan.id} value={plan.id}>
-                  {plan.name}
+                  {plan.type.toUpperCase()} · {plan.name}
                 </option>
               ))}
             </select>
